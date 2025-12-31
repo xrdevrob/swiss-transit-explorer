@@ -2,6 +2,63 @@ import type { Station, Connection, Leg } from "../types";
 
 const BASE_URL = "https://transport.opendata.ch/v1";
 
+export interface Departure {
+  line: string;
+  destination: string;
+  departurePlanned: string;
+  departureActual?: string;
+  platform?: string;
+  delayMinutes?: number;
+}
+
+export async function getStationboard(station: string, limit = 10): Promise<{
+  station: string;
+  departures: Departure[];
+  generatedAt: string;
+}> {
+  const url = new URL(`${BASE_URL}/stationboard`);
+  url.searchParams.set("station", station);
+  url.searchParams.set("limit", limit.toString());
+
+  const response = await fetch(url.toString(), {
+    headers: { "User-Agent": "SwissTransitExplorer/1.0", "Accept": "application/json" },
+  });
+
+  if (!response.ok) throw new Error(`API error: ${response.status}`);
+
+  const data = await response.json();
+  
+  const departures: Departure[] = (data.stationboard || []).map((entry: {
+    stop?: { departure?: string; platform?: string; prognosis?: { departure?: string; platform?: string } };
+    name?: string;
+    to?: string;
+  }) => {
+    const planned = entry.stop?.departure || "";
+    const actual = entry.stop?.prognosis?.departure;
+    let delayMinutes: number | undefined;
+    
+    if (planned && actual) {
+      const diff = (new Date(actual).getTime() - new Date(planned).getTime()) / 60000;
+      if (diff > 0) delayMinutes = Math.round(diff);
+    }
+
+    return {
+      line: entry.name || "",
+      destination: entry.to || "",
+      departurePlanned: planned,
+      departureActual: actual && actual !== planned ? actual : undefined,
+      platform: entry.stop?.prognosis?.platform || entry.stop?.platform,
+      delayMinutes,
+    };
+  });
+
+  return {
+    station: data.station?.name || station,
+    departures,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
 interface TransportLocation {
   id?: string;
   name: string;

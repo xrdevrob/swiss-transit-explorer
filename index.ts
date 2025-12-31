@@ -1,6 +1,6 @@
 import { MCPServer, widget, text, object } from "mcp-use/server";
 import { z } from "zod";
-import { searchStations, findConnections, checkDisruptions } from "./src/api/transport";
+import { searchStations, findConnections, checkDisruptions, getStationboard } from "./src/api/transport";
 
 const server = new MCPServer({
   name: "swiss-transit-explorer",
@@ -200,6 +200,52 @@ server.tool(
       details += `\n_Checked ${formatTime(result.checkedAt)}_`;
 
       return object({ ...result, _humanSummary: details });
+    } catch (error) {
+      return text(`Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+);
+
+// Tool: get_departures
+server.tool(
+  {
+    name: "get_departures",
+    description: "Get live departure board for a Swiss transit station. Shows next departures like the boards at train stations.",
+    schema: z.object({
+      station: z.string().describe("Station name (e.g., 'Zürich HB', 'Bern')"),
+      limit: z.number().optional().default(10).describe("Number of departures (default: 10)"),
+    }),
+    widget: {
+      name: "departures-board",
+      invoking: "Loading departure board...",
+      invoked: "Departure board loaded",
+    },
+  },
+  async ({ station, limit }) => {
+    try {
+      const result = await getStationboard(station, limit);
+      
+      if (result.departures.length === 0) {
+        return text(`No departures found for "${station}".`);
+      }
+
+      const formatTime = (iso: string) => new Date(iso).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" });
+      const nextDep = result.departures[0];
+      const delayedCount = result.departures.filter(d => d.delayMinutes && d.delayMinutes > 0).length;
+
+      let summary = `${result.station}: ${result.departures.length} upcoming departures. `;
+      summary += `Next: ${nextDep.line} to ${nextDep.destination} at ${formatTime(nextDep.departurePlanned)}`;
+      if (nextDep.platform) summary += ` (Pl. ${nextDep.platform})`;
+      if (delayedCount > 0) summary += `. ${delayedCount} train(s) delayed.`;
+
+      return widget({
+        props: {
+          station: result.station,
+          departures: result.departures,
+          generatedAt: result.generatedAt,
+        },
+        output: text(summary),
+      });
     } catch (error) {
       return text(`Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
