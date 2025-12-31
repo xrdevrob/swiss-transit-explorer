@@ -64,92 +64,87 @@ const DeparturesBoard: React.FC = () => {
   return (
     <McpUseProvider debugger viewControls autoSize>
       <AppsSDKUIProvider linkComponent={Link}>
-        <div className="bg-gray-900 border border-gray-700 rounded-2xl overflow-hidden font-mono">
-          {/* Header - styled like station displays */}
-          <div className="bg-blue-900 px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-yellow-400" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z" />
-                <path d="M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z" />
-              </svg>
-              <span className="text-yellow-400 font-bold text-lg tracking-wide">
-                {props.station}
+        <div className="bg-surface-elevated border border-default rounded-2xl overflow-hidden">
+          {/* Header - matching transit-route-explorer style */}
+          <div className="bg-gradient-to-r from-red-600 to-red-700 px-5 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z" />
+                  <path d="M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z" />
+                </svg>
+                <span className="text-white font-semibold text-sm tracking-wide">
+                  Departures
+                </span>
+              </div>
+              <span className="text-white/70 text-xs">
+                Updated {formatTime(props.generatedAt)}
               </span>
             </div>
-            <span className="text-gray-400 text-xs">
-              {formatTime(props.generatedAt)}
-            </span>
           </div>
 
-          {/* Column headers */}
-          <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-gray-800 text-gray-400 text-xs uppercase tracking-wider">
-            <div className="col-span-2">Time</div>
-            <div className="col-span-2">Line</div>
-            <div className="col-span-5">Destination</div>
-            <div className="col-span-2 text-center">Platform</div>
-            <div className="col-span-1"></div>
-          </div>
+          <div className="p-5 space-y-4">
+            {/* Station name */}
+            <h1 className="text-xl font-bold text-default">{props.station}</h1>
 
-          {/* Departures */}
-          <div className="divide-y divide-gray-800">
-            {props.departures.map((dep: Departure, i: number) => (
-              <div
-                key={i}
-                className={`grid grid-cols-12 gap-2 px-4 py-3 items-center ${
-                  i === 0 ? "bg-gray-800/50" : ""
-                }`}
-              >
-                {/* Time */}
-                <div className="col-span-2">
-                  <span className="text-yellow-400 text-lg font-bold">
-                    {formatTime(dep.departureActual || dep.departurePlanned)}
-                  </span>
-                </div>
+            {/* Departures list */}
+            <div className="space-y-2">
+              {props.departures.map((dep: Departure, i: number) => (
+                <div
+                  key={i}
+                  className="bg-surface border border-default rounded-xl p-4 flex items-center gap-4 hover:border-blue-500/50 transition-colors"
+                >
+                  {/* Time */}
+                  <div className="text-center min-w-[60px]">
+                    <div className="text-xl font-semibold text-default tabular-nums">
+                      {formatTime(dep.departureActual || dep.departurePlanned)}
+                    </div>
+                    {dep.delayMinutes && dep.delayMinutes > 0 && (
+                      <div className="text-xs text-red-500 font-medium">
+                        +{dep.delayMinutes}′
+                      </div>
+                    )}
+                  </div>
 
-                {/* Line */}
-                <div className="col-span-2">
-                  <span className={`px-2 py-1 text-xs font-bold text-white rounded ${getLineBadgeColor(dep.line)}`}>
-                    {dep.line}
-                  </span>
-                </div>
+                  {/* Line badge */}
+                  <div className="min-w-[60px]">
+                    <span className={`px-2 py-1 text-xs font-bold text-white rounded ${getLineBadgeColor(dep.line)}`}>
+                      {dep.line}
+                    </span>
+                  </div>
 
-                {/* Destination */}
-                <div className="col-span-5">
-                  <span className="text-white font-medium truncate block">
-                    {dep.destination}
-                  </span>
-                </div>
+                  {/* Destination */}
+                  <div className="flex-1 min-w-0">
+                    <span className="text-default font-medium truncate block">
+                      {dep.destination}
+                    </span>
+                  </div>
 
-                {/* Platform */}
-                <div className="col-span-2 text-center">
+                  {/* Platform */}
                   {dep.platform && (
-                    <span className={`px-2 py-1 text-sm font-bold rounded ${
-                      dep.platform.includes("!") 
-                        ? "bg-red-500/20 text-red-400" 
-                        : "bg-gray-700 text-white"
-                    }`}>
-                      {dep.platform}
-                    </span>
+                    <div className="text-right">
+                      <span
+                        className={`text-xs px-2 py-1 rounded ${
+                          dep.platform.includes("!")
+                            ? "bg-red-500/20 text-red-600 dark:text-red-400 font-medium"
+                            : "text-tertiary bg-surface-elevated"
+                        }`}
+                        title={dep.platform.includes("!") ? "⚠️ Platform changed!" : undefined}
+                      >
+                        Pl. {dep.platform}
+                      </span>
+                    </div>
                   )}
                 </div>
+              ))}
+            </div>
 
-                {/* Delay indicator */}
-                <div className="col-span-1 text-right">
-                  {dep.delayMinutes && dep.delayMinutes > 0 && (
-                    <span className="text-red-400 text-sm font-bold">
-                      +{dep.delayMinutes}′
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Footer */}
-          <div className="bg-gray-800 px-4 py-2 text-center">
-            <span className="text-gray-500 text-xs">
-              Data from transport.opendata.ch
-            </span>
+            {/* Footer */}
+            <div className="pt-3 border-t border-default">
+              <p className="text-xs text-tertiary">
+                Live data from transport.opendata.ch
+              </p>
+            </div>
           </div>
         </div>
       </AppsSDKUIProvider>
@@ -158,4 +153,3 @@ const DeparturesBoard: React.FC = () => {
 };
 
 export default DeparturesBoard;
-
