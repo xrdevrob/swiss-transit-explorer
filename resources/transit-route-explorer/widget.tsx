@@ -78,9 +78,7 @@ const TransitRouteExplorer: React.FC = () => {
               if (data.connections) {
                 setLocalConnections(data.connections);
               }
-            } catch {
-              // Not JSON
-            }
+            } catch {}
           }
         }
       }
@@ -91,7 +89,6 @@ const TransitRouteExplorer: React.FC = () => {
     }
   }, [callTool, props?.query]);
 
-  // Handle missing props gracefully
   if (!props?.query || !props?.connections) {
     return (
       <McpUseProvider debugger viewControls autoSize>

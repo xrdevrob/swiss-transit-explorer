@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import type { Connection, Leg } from "../types";
 
-// Shared helpers
 const formatTime = (isoString: string) => {
   if (!isoString) return "--:--";
   const date = new Date(isoString);
@@ -81,13 +80,11 @@ export const ConnectionCard: React.FC<ConnectionCardProps> = ({
 
   return (
     <div className="bg-surface border border-default rounded-xl overflow-hidden transition-all duration-200 hover:border-blue-500/50">
-      {/* Main card - clickable */}
       <button
         className="w-full p-4 text-left"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center justify-between gap-4">
-          {/* Times */}
           <div className="flex items-center gap-3 min-w-0">
             <div className="text-center">
               <div className="text-xl font-semibold text-default tabular-nums">
@@ -116,9 +113,7 @@ export const ConnectionCard: React.FC<ConnectionCardProps> = ({
             </div>
           </div>
 
-          {/* Center info */}
           <div className="flex-1 flex flex-col items-center gap-1.5">
-            {/* Line badges */}
             <div className="flex flex-wrap justify-center gap-1">
               {connection.legs
                 .filter((leg) => leg.type === "ride" && leg.line)
@@ -131,7 +126,6 @@ export const ConnectionCard: React.FC<ConnectionCardProps> = ({
                   </span>
                 ))}
             </div>
-            {/* Tags */}
             {connection.tags.length > 0 && (
               <div className="flex flex-wrap justify-center gap-1">
                 {connection.tags.map((tag) => (
@@ -146,7 +140,6 @@ export const ConnectionCard: React.FC<ConnectionCardProps> = ({
             )}
           </div>
 
-          {/* Right side info */}
           <div className="flex items-center gap-4 text-sm">
             <div className="text-right">
               <div className="font-medium text-default">
@@ -183,7 +176,6 @@ export const ConnectionCard: React.FC<ConnectionCardProps> = ({
         </div>
       </button>
 
-      {/* Expanded content */}
       {isExpanded && (
         <div className="border-t border-default px-4 py-3 bg-surface-elevated">
           <LegTimeline legs={connection.legs} />
@@ -209,9 +201,7 @@ const LegTimeline: React.FC<{ legs: Leg[] }> = ({ legs }) => {
 
         return (
           <React.Fragment key={index}>
-            {/* Leg */}
             <div className="flex gap-3">
-              {/* Timeline indicator */}
               <div className="flex flex-col items-center w-8">
                 <div
                   className={`w-3 h-3 rounded-full border-2 ${
@@ -234,9 +224,7 @@ const LegTimeline: React.FC<{ legs: Leg[] }> = ({ legs }) => {
                 />
               </div>
 
-              {/* Content */}
               <div className="flex-1 pb-2">
-                {/* Departure */}
                 <div className="flex items-baseline gap-2 mb-1">
                   <span className="font-mono text-sm tabular-nums text-default">
                     {formatTime(leg.from.timeActual || leg.from.timePlanned)}
@@ -250,7 +238,6 @@ const LegTimeline: React.FC<{ legs: Leg[] }> = ({ legs }) => {
                   )}
                 </div>
 
-                {/* Leg info */}
                 {leg.type === "ride" && leg.line && (
                   <div className="text-xs text-secondary ml-1 my-2">
                     <span className="font-medium">{leg.line}</span>
@@ -272,7 +259,6 @@ const LegTimeline: React.FC<{ legs: Leg[] }> = ({ legs }) => {
                   </div>
                 )}
 
-                {/* Arrival */}
                 <div className="flex items-baseline gap-2">
                   <span className="font-mono text-sm tabular-nums text-default">
                     {formatTime(leg.to.timeActual || leg.to.timePlanned)}
@@ -283,7 +269,6 @@ const LegTimeline: React.FC<{ legs: Leg[] }> = ({ legs }) => {
               </div>
             </div>
 
-            {/* Transfer indicator */}
             {transferTime !== null && (
               <div className="flex gap-3 py-2">
                 <div className="w-8 flex justify-center">

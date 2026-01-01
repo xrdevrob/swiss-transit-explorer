@@ -65,7 +65,6 @@ const DeparturesBoard: React.FC = () => {
     <McpUseProvider debugger viewControls autoSize>
       <AppsSDKUIProvider linkComponent={Link}>
         <div className="bg-surface-elevated border border-default rounded-2xl overflow-hidden">
-          {/* Header - matching transit-route-explorer style */}
           <div className="bg-gradient-to-r from-red-600 to-red-700 px-5 py-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -84,17 +83,14 @@ const DeparturesBoard: React.FC = () => {
           </div>
 
           <div className="p-5 space-y-4">
-            {/* Station name */}
             <h1 className="text-xl font-bold text-default">{props.station}</h1>
 
-            {/* Departures list */}
             <div className="space-y-2">
               {props.departures.map((dep: Departure, i: number) => (
                 <div
                   key={i}
                   className="bg-surface border border-default rounded-xl p-4 flex items-center gap-4 hover:border-blue-500/50 transition-colors"
                 >
-                  {/* Time */}
                   <div className="text-center min-w-[60px]">
                     <div className="text-xl font-semibold text-default tabular-nums">
                       {formatTime(dep.departureActual || dep.departurePlanned)}
@@ -106,21 +102,18 @@ const DeparturesBoard: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Line badge */}
                   <div className="min-w-[60px]">
                     <span className={`px-2 py-1 text-xs font-bold text-white rounded ${getLineBadgeColor(dep.line)}`}>
                       {dep.line}
                     </span>
                   </div>
 
-                  {/* Destination */}
                   <div className="flex-1 min-w-0">
                     <span className="text-default font-medium truncate block">
                       {dep.destination}
                     </span>
                   </div>
 
-                  {/* Platform */}
                   {dep.platform && (
                     <div className="text-right">
                       <span
@@ -139,7 +132,6 @@ const DeparturesBoard: React.FC = () => {
               ))}
             </div>
 
-            {/* Footer */}
             <div className="pt-3 border-t border-default">
               <p className="text-xs text-tertiary">
                 Live data from transport.opendata.ch

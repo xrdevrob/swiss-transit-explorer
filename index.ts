@@ -9,7 +9,6 @@ const server = new MCPServer({
   baseUrl: process.env.MCP_URL || "http://localhost:3000",
 });
 
-// Tool: search_stations
 server.tool(
   {
     name: "search_stations",
@@ -35,7 +34,6 @@ server.tool(
   }
 );
 
-// Tool: find_connections
 server.tool(
   {
     name: "find_connections",
@@ -85,7 +83,6 @@ server.tool(
   }
 );
 
-// Tool: find_connections_arrive_by
 server.tool(
   {
     name: "find_connections_arrive_by",
@@ -129,7 +126,6 @@ server.tool(
   }
 );
 
-// Tool: get_connection_details
 server.tool(
   {
     name: "get_connection_details",
@@ -170,7 +166,6 @@ server.tool(
   }
 );
 
-// Tool: check_disruptions
 server.tool(
   {
     name: "check_disruptions",
@@ -206,7 +201,6 @@ server.tool(
   }
 );
 
-// Tool: get_departures
 server.tool(
   {
     name: "get_departures",
@@ -252,7 +246,6 @@ server.tool(
   }
 );
 
-// Helper: parse flexible datetime formats
 function parseDateTime(datetime?: string): string {
   if (!datetime) return new Date().toISOString();
   
@@ -279,7 +272,6 @@ function parseDateTime(datetime?: string): string {
   return isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
 }
 
-// Prompts (templates for common queries)
 server.prompt(
   {
     name: "template_commute",
