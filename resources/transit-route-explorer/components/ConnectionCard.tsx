@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import type { Connection, Leg, ReliabilityInsight, TransferRisk } from "../types";
+import type { Connection, Leg, TransferRisk, WeatherSample, WeatherInsight } from "../types";
 
 const formatTime = (isoString: string) => {
   if (!isoString) return "--:--";
@@ -80,6 +80,27 @@ export const ConnectionCard: React.FC<ConnectionCardProps> = ({
       case "medium": return "Med Risk";
       case "high": return "High Risk";
       default: return "Unknown";
+    }
+  };
+
+  const getWeatherIcon = (weather?: WeatherInsight) => {
+    if (!weather?.samples?.length) return "⛅";
+    const sample = weather.samples[0];
+    if (sample.snowfall > 0) return "❄️";
+    if (sample.precipitation > 5) return "🌧️";
+    if (sample.precipitation > 0) return "🌦️";
+    if (sample.windGusts > 50) return "💨";
+    if (sample.temperature > 25) return "☀️";
+    if (sample.temperature <= 2) return "🥶";
+    return "⛅";
+  };
+
+  const getWeatherLevelStyle = (level?: "low" | "medium" | "high") => {
+    switch (level) {
+      case "low": return "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400";
+      case "medium": return "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400";
+      case "high": return "bg-orange-500/20 text-orange-600 dark:text-orange-400";
+      default: return "bg-gray-500/20 text-gray-600 dark:text-gray-400";
     }
   };
 
@@ -169,6 +190,19 @@ export const ConnectionCard: React.FC<ConnectionCardProps> = ({
                   : `${connection.transfersCount} transfer${connection.transfersCount > 1 ? "s" : ""}`}
               </div>
             </div>
+            {connection.weather && (
+              <div 
+                className={`flex items-center gap-1 px-2 py-1 rounded-lg ${getWeatherLevelStyle(connection.weather.level)}`}
+                title={connection.weather.reasons.map(r => r.label).join(", ") || "Good weather"}
+              >
+                <span className="text-base">{getWeatherIcon(connection.weather)}</span>
+                {connection.weather.samples[0] && (
+                  <span className="text-xs font-medium">
+                    {Math.round(connection.weather.samples[0].temperature)}°
+                  </span>
+                )}
+              </div>
+            )}
             {connection.reliability && (
               <div className="flex items-center gap-2">
                 <div 
@@ -233,6 +267,10 @@ export const ConnectionCard: React.FC<ConnectionCardProps> = ({
             <TransferRisksTable risks={connection.reliability.transferRisks} />
           )}
 
+          {connection.weather && connection.weather.samples.length > 0 && (
+            <WeatherPanel weather={connection.weather} />
+          )}
+
           <LegTimeline legs={connection.legs} />
         </div>
       )}
@@ -292,17 +330,97 @@ const TransferRisksTable: React.FC<{ risks: TransferRisk[] }> = ({ risks }) => {
   );
 };
 
+const WeatherPanel: React.FC<{ weather: WeatherInsight }> = ({ weather }) => {
+  const getWeatherEmoji = (sample: WeatherSample) => {
+    if (sample.snowfall > 0) return "❄️";
+    if (sample.precipitation > 5) return "🌧️";
+    if (sample.precipitation > 0) return "🌦️";
+    if (sample.windGusts > 50) return "💨";
+    if (sample.temperature > 25) return "☀️";
+    if (sample.temperature <= 2) return "🥶";
+    return "⛅";
+  };
+
+  const formatWeather = (sample: WeatherSample) => {
+    const parts: string[] = [`${Math.round(sample.temperature)}°C`];
+    if (sample.precipitation > 0) parts.push(`${sample.precipitation.toFixed(1)}mm`);
+    if (sample.snowfall > 0) parts.push(`${sample.snowfall.toFixed(1)}cm snow`);
+    if (sample.windGusts > 30) parts.push(`${Math.round(sample.windGusts)}km/h gusts`);
+    return parts.join(", ");
+  };
+
+  const formatTime = (iso: string) => {
+    if (!iso) return "--:--";
+    return new Date(iso).toLocaleTimeString("de-CH", { hour: "2-digit", minute: "2-digit" });
+  };
+
+  const sortedSamples = [...weather.samples].sort((a, b) => 
+    new Date(a.time).getTime() - new Date(b.time).getTime()
+  );
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <div className="text-xs font-medium text-secondary uppercase tracking-wide">Weather Conditions</div>
+        {weather.reasons.length > 0 && (
+          <div className="flex gap-1">
+            {weather.reasons.map((reason, i) => (
+              <span
+                key={i}
+                className="px-1.5 py-0.5 text-[10px] rounded-full bg-orange-500/20 text-orange-600 dark:text-orange-400"
+              >
+                {reason.label}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="rounded-lg border border-default overflow-hidden">
+        <table className="w-full text-xs">
+          <thead className="bg-surface">
+            <tr className="text-left text-tertiary">
+              <th className="px-3 py-2 font-medium">Location</th>
+              <th className="px-3 py-2 font-medium text-center">Time</th>
+              <th className="px-3 py-2 font-medium text-right">Conditions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-default">
+            {sortedSamples.map((sample, i) => (
+              <tr key={i} className="bg-surface-elevated">
+                <td className="px-3 py-2">
+                  <span className="text-default">{sample.station}</span>
+                </td>
+                <td className="px-3 py-2 text-center font-mono tabular-nums text-tertiary">
+                  {formatTime(sample.time)}
+                </td>
+                <td className="px-3 py-2 text-right">
+                  <span className="mr-1">{getWeatherEmoji(sample)}</span>
+                  <span className="text-default">{formatWeather(sample)}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 const LegTimeline: React.FC<{ legs: Leg[] }> = ({ legs }) => {
-  const getTransferTime = (legIndex: number): number | null => {
-    if (legIndex >= legs.length - 1) return null;
-    const arrival = new Date(legs[legIndex].to.timeActual || legs[legIndex].to.timePlanned).getTime();
-    const departure = new Date(legs[legIndex + 1].from.timePlanned).getTime();
+  // Only show ride legs, skip walks
+  const rideLegs = legs.filter(l => l.type === "ride");
+
+  // Calculate transfer time between consecutive ride legs (includes walk time)
+  const getTransferTime = (rideIndex: number): number | null => {
+    if (rideIndex >= rideLegs.length - 1) return null;
+    const arrival = new Date(rideLegs[rideIndex].to.timeActual || rideLegs[rideIndex].to.timePlanned).getTime();
+    const departure = new Date(rideLegs[rideIndex + 1].from.timePlanned).getTime();
     return Math.round((departure - arrival) / 60000);
   };
 
   return (
     <div className="space-y-0">
-      {legs.map((leg, index) => {
+      {rideLegs.map((leg, index) => {
         const transferTime = getTransferTime(index);
         const isTightTransfer = transferTime !== null && transferTime < 6;
 
@@ -310,25 +428,9 @@ const LegTimeline: React.FC<{ legs: Leg[] }> = ({ legs }) => {
           <React.Fragment key={index}>
             <div className="flex gap-3">
               <div className="flex flex-col items-center w-8">
-                <div
-                  className={`w-3 h-3 rounded-full border-2 ${
-                    leg.type === "walk"
-                      ? "border-gray-400 bg-transparent"
-                      : "border-blue-500 bg-blue-500"
-                  }`}
-                />
-                <div
-                  className={`flex-1 w-0.5 min-h-8 ${
-                    leg.type === "walk" ? "border-l-2 border-dashed border-gray-400" : "bg-blue-500"
-                  }`}
-                />
-                <div
-                  className={`w-3 h-3 rounded-full border-2 ${
-                    leg.type === "walk"
-                      ? "border-gray-400 bg-transparent"
-                      : "border-blue-500 bg-blue-500"
-                  }`}
-                />
+                <div className="w-3 h-3 rounded-full border-2 border-blue-500 bg-blue-500" />
+                <div className="flex-1 w-0.5 min-h-8 bg-blue-500" />
+                <div className="w-3 h-3 rounded-full border-2 border-blue-500 bg-blue-500" />
               </div>
 
               <div className="flex-1 pb-2">
@@ -345,26 +447,10 @@ const LegTimeline: React.FC<{ legs: Leg[] }> = ({ legs }) => {
                   )}
                 </div>
 
-                {leg.type === "ride" && leg.line && (
-                  <div className="text-xs text-secondary ml-1 my-2">
-                    <span className="font-medium">{leg.line}</span>
-                    {leg.operator && <span className="text-tertiary"> · {leg.operator}</span>}
-                    {leg.stops && leg.stops.length > 0 && (
-                      <span className="text-tertiary">
-                        {" "}
-                        · {leg.stops.length} stop{leg.stops.length > 1 ? "s" : ""}
-                      </span>
-                    )}
-                  </div>
-                )}
-                {leg.type === "walk" && (
-                  <div className="text-xs text-tertiary ml-1 my-2 flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
-                    Walk
-                  </div>
-                )}
+                <div className="text-xs text-secondary ml-1 my-2">
+                  <span className="font-medium">{leg.line}</span>
+                  {leg.operator && <span className="text-tertiary"> · {leg.operator}</span>}
+                </div>
 
                 <div className="flex items-baseline gap-2">
                   <span className="font-mono text-sm tabular-nums text-default">
