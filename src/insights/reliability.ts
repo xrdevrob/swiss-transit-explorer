@@ -45,23 +45,31 @@ export function calculateReliability(legs: Leg[], departureTime: string): Reliab
   const transferRisks: TransferRisk[] = [];
   let totalPenalty = 0;
 
-  const transfers = legs.length - 1;
-  if (transfers > 0) {
-    const penalty = 0.12 * transfers;
+  // Get only ride legs
+  const rideLegs = legs.filter(l => l.type === "ride");
+  const realTransfers = rideLegs.length - 1;
+
+  if (realTransfers > 0) {
+    const penalty = 0.12 * realTransfers;
     totalPenalty += penalty;
     reasons.push({
       code: "transfers",
-      label: `${transfers} transfer${transfers > 1 ? "s" : ""}`,
+      label: `${realTransfers} transfer${realTransfers > 1 ? "s" : ""}`,
       penalty,
     });
   }
 
-  for (let i = 0; i < legs.length - 1; i++) {
-    const arrivalTime = new Date(legs[i].to.timeActual || legs[i].to.timePlanned).getTime();
-    const departureTimeNext = new Date(legs[i + 1].from.timePlanned).getTime();
+  // Analyze transfer risks between consecutive ride legs
+  for (let i = 0; i < rideLegs.length - 1; i++) {
+    const currentRide = rideLegs[i];
+    const nextRide = rideLegs[i + 1];
+
+    // Calculate margin from this ride's arrival to next ride's departure
+    const arrivalTime = new Date(currentRide.to.timeActual || currentRide.to.timePlanned).getTime();
+    const departureTimeNext = new Date(nextRide.from.timePlanned).getTime();
     const marginMin = Math.round((departureTimeNext - arrivalTime) / 60000);
     
-    const transferStation = legs[i].to.name;
+    const transferStation = currentRide.to.name;
     const bigStation = isBigStation(transferStation);
     
     let transferPenalty = 0;
@@ -88,7 +96,7 @@ export function calculateReliability(legs: Leg[], departureTime: string): Reliab
       riskLevel = "low";
     }
 
-    if (bigStation && transfers > 0) {
+    if (bigStation && realTransfers > 0) {
       const stationPenalty = 0.08;
       totalPenalty += stationPenalty;
       if (!reasons.find(r => r.code === "big_station")) {
@@ -103,8 +111,8 @@ export function calculateReliability(legs: Leg[], departureTime: string): Reliab
     totalPenalty += transferPenalty;
 
     transferRisks.push({
-      fromStation: legs[i].to.name,
-      toStation: legs[i + 1].from.name,
+      fromStation: currentRide.to.name,
+      toStation: nextRide.from.name,
       marginMinutes: marginMin,
       riskLevel,
       isBigStation: bigStation,
