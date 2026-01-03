@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import type { Connection, Leg } from "../types";
+import type { Connection, Leg, ReliabilityInsight, TransferRisk } from "../types";
 
 const formatTime = (isoString: string) => {
   if (!isoString) return "--:--";
@@ -63,6 +63,24 @@ export const ConnectionCard: React.FC<ConnectionCardProps> = ({
     if (score >= 0.8) return "text-emerald-500";
     if (score >= 0.6) return "text-yellow-500";
     return "text-red-500";
+  };
+
+  const getRiskLevelStyle = (level?: "low" | "medium" | "high") => {
+    switch (level) {
+      case "low": return "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400";
+      case "medium": return "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400";
+      case "high": return "bg-red-500/20 text-red-600 dark:text-red-400";
+      default: return "bg-gray-500/20 text-gray-600 dark:text-gray-400";
+    }
+  };
+
+  const getRiskLevelLabel = (level?: "low" | "medium" | "high") => {
+    switch (level) {
+      case "low": return "Low Risk";
+      case "medium": return "Med Risk";
+      case "high": return "High Risk";
+      default: return "Unknown";
+    }
   };
 
   const getTagStyle = (tag: string) => {
@@ -151,7 +169,23 @@ export const ConnectionCard: React.FC<ConnectionCardProps> = ({
                   : `${connection.transfersCount} transfer${connection.transfersCount > 1 ? "s" : ""}`}
               </div>
             </div>
-            {connection.reliabilityScore !== undefined && (
+            {connection.reliability && (
+              <div className="flex items-center gap-2">
+                <div 
+                  className={`text-right cursor-help ${getReliabilityColor(connection.reliability.score)}`}
+                  title="Reliability score based on: transfers, timing margins, station complexity, rush hour, and current delays. Higher % = more likely to arrive on time."
+                >
+                  <div className="text-lg font-semibold">
+                    {Math.round(connection.reliability.score * 100)}%
+                  </div>
+                  <div className="text-[10px] opacity-70">reliable</div>
+                </div>
+                <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${getRiskLevelStyle(connection.reliability.level)}`}>
+                  {getRiskLevelLabel(connection.reliability.level)}
+                </span>
+              </div>
+            )}
+            {!connection.reliability && connection.reliabilityScore !== undefined && (
               <div 
                 className={`text-right cursor-help ${getReliabilityColor(connection.reliabilityScore)}`}
                 title="Reliability score based on: number of transfers (fewer = better), connection type (direct trains score higher), and current delays. Higher % = more likely to arrive on time."
@@ -177,10 +211,83 @@ export const ConnectionCard: React.FC<ConnectionCardProps> = ({
       </button>
 
       {isExpanded && (
-        <div className="border-t border-default px-4 py-3 bg-surface-elevated">
+        <div className="border-t border-default px-4 py-3 bg-surface-elevated space-y-4">
+          {connection.reliability && connection.reliability.reasons.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-xs font-medium text-secondary uppercase tracking-wide">Risk Factors</div>
+              <div className="flex flex-wrap gap-1.5">
+                {connection.reliability.reasons.map((reason, i) => (
+                  <span
+                    key={i}
+                    className="px-2 py-1 text-xs rounded-full bg-surface border border-default text-secondary"
+                    title={`Impact: -${Math.round(reason.penalty * 100)}%`}
+                  >
+                    {reason.label}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {connection.reliability && connection.reliability.transferRisks.length > 0 && (
+            <TransferRisksTable risks={connection.reliability.transferRisks} />
+          )}
+
           <LegTimeline legs={connection.legs} />
         </div>
       )}
+    </div>
+  );
+};
+
+const TransferRisksTable: React.FC<{ risks: TransferRisk[] }> = ({ risks }) => {
+  if (risks.length === 0) return null;
+
+  const getRiskBadge = (level: "low" | "medium" | "high") => {
+    const styles = {
+      low: "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400",
+      medium: "bg-yellow-500/20 text-yellow-600 dark:text-yellow-400",
+      high: "bg-red-500/20 text-red-600 dark:text-red-400",
+    };
+    return (
+      <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${styles[level]}`}>
+        {level}
+      </span>
+    );
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="text-xs font-medium text-secondary uppercase tracking-wide">Transfer Analysis</div>
+      <div className="rounded-lg border border-default overflow-hidden">
+        <table className="w-full text-xs">
+          <thead className="bg-surface">
+            <tr className="text-left text-tertiary">
+              <th className="px-3 py-2 font-medium">Station</th>
+              <th className="px-3 py-2 font-medium text-center">Margin</th>
+              <th className="px-3 py-2 font-medium text-center">Risk</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-default">
+            {risks.map((risk, i) => (
+              <tr key={i} className="bg-surface-elevated">
+                <td className="px-3 py-2">
+                  <span className="text-default">{risk.fromStation}</span>
+                  {risk.isBigStation && (
+                    <span className="ml-1 text-tertiary text-[10px]">(large station)</span>
+                  )}
+                </td>
+                <td className="px-3 py-2 text-center font-mono tabular-nums text-default">
+                  {risk.marginMinutes}min
+                </td>
+                <td className="px-3 py-2 text-center">
+                  {getRiskBadge(risk.riskLevel)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

@@ -1,4 +1,5 @@
-import type { Station, Connection, Leg } from "../types";
+import type { Station, Connection, Leg, ReliabilityInsight } from "../types";
+import { calculateReliability } from "../insights/reliability";
 
 const BASE_URL = "https://transport.opendata.ch/v1";
 
@@ -158,6 +159,8 @@ export async function findConnections(
     if (conn.transfers === fewestTransfers) tags.push("fewest transfers");
     if (index === 0) tags.push("recommended");
 
+    const reliability = calculateReliability(legs, conn.from.departure || new Date().toISOString());
+
     return {
       id: generateConnectionId(conn),
       departureTime: conn.from.departure || "",
@@ -165,7 +168,8 @@ export async function findConnections(
       durationMinutes: duration,
       transfersCount: conn.transfers,
       legs,
-      reliabilityScore: calculateReliabilityScore(legs, conn.transfers),
+      reliabilityScore: reliability.score,
+      reliability,
       tags,
     };
   });
@@ -235,24 +239,6 @@ function normalizeLegs(sections: TransportSection[]): Leg[] {
 function generateConnectionId(conn: TransportConnection): string {
   const lines = conn.sections.filter((s) => s.journey).map((s) => s.journey?.name).join("-");
   return `${conn.from.departure || ""}-${lines}`.replace(/[^a-zA-Z0-9-]/g, "_");
-}
-
-function calculateReliabilityScore(legs: Leg[], transfers: number): number {
-  let score = 1.0;
-  score -= 0.15 * transfers;
-
-  for (let i = 0; i < legs.length - 1; i++) {
-    const arrivalTime = new Date(legs[i].to.timeActual || legs[i].to.timePlanned).getTime();
-    const departureTime = new Date(legs[i + 1].from.timePlanned).getTime();
-    const transferMinutes = (departureTime - arrivalTime) / 60000;
-    if (transferMinutes < 6 && transferMinutes > 0) score -= 0.10;
-  }
-
-  for (const leg of legs) {
-    if (leg.delayMinutes && leg.delayMinutes > 3) score -= 0.05;
-  }
-
-  return Math.max(0, Math.min(1, score));
 }
 
 interface DelayedRoute {
