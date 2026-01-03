@@ -43,6 +43,32 @@ export interface ReliabilityInsight {
   transferRisks: TransferRisk[];
 }
 
+export interface WeatherSample {
+  station: string;
+  time: string;
+  lat: number;
+  lon: number;
+  temperature: number;
+  precipitation: number;
+  snowfall: number;
+  windSpeed: number;
+  windGusts: number;
+  weatherCode: number;
+}
+
+export interface WeatherReason {
+  code: string;
+  label: string;
+  penalty: number;
+}
+
+export interface WeatherInsight {
+  level: "low" | "medium" | "high";
+  penalty: number;
+  reasons: WeatherReason[];
+  samples: WeatherSample[];
+}
+
 export interface Connection {
   id: string;
   departureTime: string;
@@ -52,6 +78,7 @@ export interface Connection {
   legs: Leg[];
   reliabilityScore?: number;
   reliability?: ReliabilityInsight;
+  weather?: WeatherInsight;
   tags: string[];
 }
 
