@@ -1,6 +1,6 @@
 import { MCPServer, widget, text, object } from "mcp-use/server";
 import { z } from "zod";
-import { searchStations, findConnections, checkDisruptions, getStationboard } from "./src/api/transport";
+import { searchStations, findConnections, checkDisruptions, getStationboard, getStationWeather } from "./src/api/transport";
 
 const server = new MCPServer({
   name: "swiss-transit-explorer",
@@ -239,6 +239,44 @@ server.tool(
           generatedAt: result.generatedAt,
         },
         output: text(summary),
+      });
+    } catch (error) {
+      return text(`Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+);
+
+server.tool(
+  {
+    name: "get_weather",
+    description: "Get current weather at a Swiss transit station. Use when user asks about temperature, weather conditions, rain, snow at a station.",
+    schema: z.object({
+      station: z.string().describe("Station name (e.g., 'Zürich HB', 'Bern', 'Zürich Oerlikon')"),
+    }),
+  },
+  async ({ station }) => {
+    try {
+      const weather = await getStationWeather(station);
+      
+      if (!weather) {
+        return text(`Could not find weather for "${station}". Try a different station name.`);
+      }
+
+      const emoji = weather.snowfall > 0 ? "❄️" : 
+                    weather.precipitation > 5 ? "🌧️" : 
+                    weather.precipitation > 0 ? "🌦️" : 
+                    weather.windGusts > 50 ? "💨" : 
+                    weather.temperature > 25 ? "☀️" : 
+                    weather.temperature <= 2 ? "🥶" : "⛅";
+
+      let summary = `${emoji} **${weather.station}**: ${weather.temperature}°C, ${weather.conditions.toLowerCase()}`;
+      if (weather.precipitation > 0) summary += `, ${weather.precipitation}mm precipitation`;
+      if (weather.snowfall > 0) summary += `, ${weather.snowfall}cm snow`;
+      if (weather.windGusts > 30) summary += `, gusts ${Math.round(weather.windGusts)}km/h`;
+
+      return object({
+        ...weather,
+        _summary: summary,
       });
     } catch (error) {
       return text(`Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
