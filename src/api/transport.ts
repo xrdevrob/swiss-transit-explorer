@@ -1,5 +1,6 @@
-import type { Station, Connection, Leg, ReliabilityInsight } from "../types";
+import type { Station, Connection, Leg, WeatherInsight } from "../types";
 import { calculateReliability } from "../insights/reliability";
+import { getWeatherInsights } from "../insights/weather";
 
 const BASE_URL = "https://transport.opendata.ch/v1";
 
@@ -116,12 +117,68 @@ export async function searchStations(query: string, limit = 8): Promise<Station[
     .map((s: TransportLocation) => ({ id: s.id, name: s.name }));
 }
 
+export async function getStationWeather(stationName: string): Promise<{
+  station: string;
+  temperature: number;
+  precipitation: number;
+  snowfall: number;
+  windSpeed: number;
+  windGusts: number;
+  conditions: string;
+  checkedAt: string;
+} | null> {
+  const url = new URL(`${BASE_URL}/locations`);
+  url.searchParams.set("query", stationName);
+  url.searchParams.set("type", "station");
+
+  const response = await fetch(url.toString(), {
+    headers: { "User-Agent": "SwissTransitExplorer/1.0", "Accept": "application/json" },
+  });
+
+  if (!response.ok) return null;
+
+  const data = await response.json();
+  const station = data.stations?.find((s: TransportLocation) => s.name && s.coordinate);
+  if (!station?.coordinate) return null;
+
+  const weather = await getWeatherInsights([{
+    name: station.name,
+    lat: station.coordinate.x,
+    lon: station.coordinate.y,
+    time: new Date().toISOString(),
+  }]);
+
+  if (!weather?.samples?.length) return null;
+
+  const sample = weather.samples[0];
+  let conditions = "Clear";
+  if (sample.snowfall > 0) conditions = "Snowing";
+  else if (sample.precipitation > 5) conditions = "Heavy rain";
+  else if (sample.precipitation > 0) conditions = "Light rain";
+  else if (sample.windGusts > 50) conditions = "Windy";
+  else if (sample.temperature > 25) conditions = "Hot";
+  else if (sample.temperature <= 2) conditions = "Cold";
+  else conditions = "Mild";
+
+  return {
+    station: station.name,
+    temperature: Math.round(sample.temperature * 10) / 10,
+    precipitation: sample.precipitation,
+    snowfall: sample.snowfall,
+    windSpeed: sample.windSpeed,
+    windGusts: sample.windGusts,
+    conditions,
+    checkedAt: new Date().toISOString(),
+  };
+}
+
 export async function findConnections(
   from: string,
   to: string,
   datetime?: string,
   isArrivalTime = false,
-  limit = 6
+  limit = 6,
+  includeWeather = true
 ): Promise<{ connections: Connection[]; fromStation?: Station; toStation?: Station }> {
   const url = new URL(`${BASE_URL}/connections`);
   url.searchParams.set("from", from);
@@ -152,27 +209,35 @@ export async function findConnections(
     return { conn, duration, index };
   });
 
-  const connections: Connection[] = processed.map(({ conn, duration, index }: { conn: TransportConnection; duration: number; index: number }) => {
-    const legs = normalizeLegs(conn.sections);
-    const tags: string[] = [];
-    if (duration === fastestDuration) tags.push("fastest");
-    if (conn.transfers === fewestTransfers) tags.push("fewest transfers");
-    if (index === 0) tags.push("recommended");
+  const connections: Connection[] = await Promise.all(
+    processed.map(async ({ conn, duration, index }: { conn: TransportConnection; duration: number; index: number }) => {
+      const legs = normalizeLegs(conn.sections);
+      const tags: string[] = [];
+      if (duration === fastestDuration) tags.push("fastest");
+      if (conn.transfers === fewestTransfers) tags.push("fewest transfers");
+      if (index === 0) tags.push("recommended");
 
-    const reliability = calculateReliability(legs, conn.from.departure || new Date().toISOString());
+      const reliability = calculateReliability(legs, conn.from.departure || new Date().toISOString());
 
-    return {
-      id: generateConnectionId(conn),
-      departureTime: conn.from.departure || "",
-      arrivalTime: conn.to.arrival || "",
-      durationMinutes: duration,
-      transfersCount: conn.transfers,
-      legs,
-      reliabilityScore: reliability.score,
-      reliability,
-      tags,
-    };
-  });
+      let weather: WeatherInsight | undefined;
+      if (includeWeather) {
+        weather = await getWeatherForConnection(conn);
+      }
+
+      return {
+        id: generateConnectionId(conn),
+        departureTime: conn.from.departure || "",
+        arrivalTime: conn.to.arrival || "",
+        durationMinutes: duration,
+        transfersCount: conn.transfers,
+        legs,
+        reliabilityScore: reliability.score,
+        reliability,
+        weather,
+        tags,
+      };
+    })
+  );
 
   let fromStation: Station | undefined;
   let toStation: Station | undefined;
@@ -182,6 +247,46 @@ export async function findConnections(
   }
 
   return { connections, fromStation, toStation };
+}
+
+async function getWeatherForConnection(conn: TransportConnection): Promise<WeatherInsight | undefined> {
+  const stations: { name: string; lat: number; lon: number; time: string }[] = [];
+  const seenStations = new Set<string>();
+
+  const addStation = (name: string, coord: { x: number; y: number }, time: string) => {
+    const key = name.split(",")[0].trim(); // Normalize "Lenzburg, Bahnhof" to "Lenzburg"
+    if (seenStations.has(key)) return;
+    seenStations.add(key);
+    stations.push({ name, lat: coord.x, lon: coord.y, time });
+  };
+
+  // Origin at departure (Transport API: x=lat, y=lon)
+  if (conn.from.station.coordinate) {
+    addStation(conn.from.station.name, conn.from.station.coordinate, conn.from.departure || new Date().toISOString());
+  }
+
+  // Transfer stations - only add arrivals from ride legs (skip walks)
+  for (let i = 0; i < conn.sections.length - 1 && stations.length < 3; i++) {
+    const section = conn.sections[i];
+    if (section.walk) continue; // Skip walk segments
+    const arrival = section.arrival;
+    if (arrival.station.coordinate) {
+      addStation(arrival.station.name, arrival.station.coordinate, arrival.arrival || new Date().toISOString());
+    }
+  }
+
+  // Destination at arrival
+  if (conn.to.station.coordinate) {
+    addStation(conn.to.station.name, conn.to.station.coordinate, conn.to.arrival || new Date().toISOString());
+  }
+
+  if (stations.length === 0) return undefined;
+
+  try {
+    return await getWeatherInsights(stations);
+  } catch {
+    return undefined;
+  }
 }
 
 function parseDuration(duration?: string): number {
